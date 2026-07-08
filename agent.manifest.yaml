@@ -959,28 +959,28 @@ agents:
     file: engineering/infra-reviewer.md
     category: engineering
     scope: project
-    description: 'Use this agent for reviewing Terraform plans, validating GCP configurations, auditing CI/CD pipelines for
-      infra conflicts, or catching cloud gotchas before `terraform apply` hits production. Specializes in GCP (Cloud Run,
-      Certificate Manager, Network Security, CAS, ALB), Terraform state conflicts, and consistency between gcloud scripts
-      and Terraform. Fires on: "review the ALB mTLS Terraform module before apply" — pre-apply review (TrustConfig must be
-      `global` not regional, ServerTlsPolicy + cert-map full resource paths, backend-service protocol HTTPS for serverless
-      NEGs not H2, EXTERNAL_MANAGED scheme for global ALB, cert-map ref with `//certificatemanager.googleapis.com/` prefix);
-      "gcloud deploy and Terraform keep overwriting each other" — dual-management conflicts (same Cloud Run service in both
-      pipelines, ingress flag drift, env-var divergence — pick one source of truth and import the other); "Terraform apply
-      fails with permission denied" — IAM debugging (service-account least-privilege per resource type, required `google_project_service`
-      enablements, project/folder/org scoping); state drift detection (resources modified outside Terraform, `terraform import`
-      for unmanaged); Cloud Run config (ingress restrictions incl. `internal-and-cloud-load-balancing`, timeout for streaming
-      RPCs, concurrency, VPC connector); forwarding-rule → proxy → url-map → backend chain validation; secrets-not-in-env
-      / logs / VCS audit; Firebase App Hosting ingress quirks (not inside VPC). Input to this agent should include: the exact
-      PR number or Terraform plan path, and the GCP project context. Anti-scope: pipeline authoring routes to `devops-automator`;
-      app-side security audit routes to `security-auditor`; proto contract issues route to `grpc-contracts`.'
-    description_summary: Use for pre-apply infrastructure reviews, Terraform plan validation, GCP configuration audits, CI/CD
-      infra conflict detection, IAM troubleshooting, and state drift analysis. Specializes in GCP resources such as Cloud
-      Run, Certificate Manager, Network Security, CAS, global ALB chains, serverless NEGs, Terraform state conflicts, and
-      consistency between gcloud scripts and Terraform-managed resources. Inputs should include the exact PR number or Terraform
-      plan path plus GCP project context. Do not route pipeline authoring, app-side security audits, or proto contract issues
-      here; those belong to devops automation, security audit, or gRPC contract review respectively.
-    description_hash: sha256:f10163a8cae5439f62aa0e4c9d7f77f05df5e006f841b82f95079c6c60c1e525
+    description: 'Use this agent proactively after Terraform/IaC or CI/CD config changes, and for reviewing Terraform plans,
+      validating GCP configurations, auditing CI/CD pipelines for infra conflicts, or catching cloud gotchas before `terraform
+      apply` hits production. Specializes in GCP (Cloud Run, Certificate Manager, Network Security, CAS, ALB), Terraform state
+      conflicts, and consistency between gcloud scripts and Terraform. Fires on: "review the ALB mTLS Terraform module before
+      apply" — pre-apply review (TrustConfig must be `global` not regional, ServerTlsPolicy + cert-map full resource paths,
+      backend-service protocol HTTPS for serverless NEGs not H2, EXTERNAL_MANAGED scheme for global ALB, cert-map ref with
+      `//certificatemanager.googleapis.com/` prefix); "gcloud deploy and Terraform keep overwriting each other" — dual-management
+      conflicts (same Cloud Run service in both pipelines, ingress flag drift, env-var divergence — pick one source of truth
+      and import the other); "Terraform apply fails with permission denied" — IAM debugging (service-account least-privilege
+      per resource type, required `google_project_service` enablements, project/folder/org scoping); state drift detection
+      (resources modified outside Terraform, `terraform import` for unmanaged); Cloud Run config (ingress restrictions incl.
+      `internal-and-cloud-load-balancing`, timeout for streaming RPCs, concurrency, VPC connector); forwarding-rule → proxy
+      → url-map → backend chain validation; secrets-not-in-env / logs / VCS audit; Firebase App Hosting ingress quirks (not
+      inside VPC). Input to this agent should include: the exact PR number or Terraform plan path, and the GCP project context.
+      Anti-scope: pipeline authoring routes to `devops-automator`; app-side security audit routes to `security-auditor`; proto
+      contract issues route to `grpc-contracts`.'
+    description_summary: 'Use proactively after Terraform/IaC or CI/CD config changes, and for pre-apply infrastructure review:
+      Terraform plan validation, GCP configuration audits, CI/CD pipeline review, cost and blast-radius checks, least-privilege
+      IAM review. Read-only reviewer — reports findings with severity and remediation, never applies changes. Routes security
+      threat-modeling and auth-flow audits to security-auditor, pipeline authoring/automation to devops-automator, and production
+      reliability operations to infrastructure-maintainer.'
+    description_hash: sha256:147cab5804c88c2c013cf0d015dca475e32f791e01badc29259799d857f9b33a
     body_hash: sha256:0e93e166695937297146826e434816a1ea1ac61d9b91c2510dfd2b4525e57a28
     tags:
     - engineering
@@ -1653,9 +1653,9 @@ agents:
     file: engineering/test-writer-fixer.md
     category: engineering
     scope: project
-    description: 'Use this agent when code changes have been made and you need to write new tests, run existing tests, analyze
-      failures, and fix them while maintaining test integrity. Triggered proactively after code modifications to ensure coverage
-      and suite health. Fires on: "updated user authentication logic to support OAuth" — post-implementation test runs (identify
+    description: 'Use this agent proactively after code changes to write new tests, run existing tests, analyze failures,
+      and fix them while maintaining test integrity. Triggered proactively after code modifications to ensure coverage and
+      suite health. Fires on: "updated user authentication logic to support OAuth" — post-implementation test runs (identify
       affected test files via import graph, scope focused → full suite, parse failures, fix without weakening); "refactor
       payment module to async/await" — post-refactor test runs (update expectations only when code behavior legitimately changed,
       refactor brittle tests for resilience, preserve original intent); "fix race condition in data sync service" — post-bugfix
@@ -1667,12 +1667,12 @@ agents:
       Distinguishes legitimate behavior change → update expectations; brittle test → refactor; actual code bug → flag, do
       not paper over. Anti-scope: language-specific implementation review routes to the relevant language agent; load and
       performance testing routes to `devops-automator`; security-test authoring routes to `security-auditor`.'
-    description_summary: Use after code changes to add or update tests, run focused and broader suites, analyze failures,
-      and fix test or code issues without weakening coverage. It specializes in test authoring and maintenance across common
-      JS/TS, Python, Go, Ruby, Java, Swift, and Kotlin test frameworks, including distinguishing legitimate behavior changes
-      from brittle tests and real regressions. Do not route language-specific implementation review here; load or performance
-      testing belongs to devops automation, and security-test authoring belongs to security audit work.
-    description_hash: sha256:e4a977d17c1e6091a87e844e6ddc3878dce704a8853bae48c3920b3662fbe813
+    description_summary: Use proactively after code changes to write new tests, run focused and broader suites, analyze failures,
+      and fix them while preserving test intent. Returns FULL verbatim stderr on failures (never summarized/truncated), with
+      analysis layered separately. Owns the green/red gate on a PR-scoped change — unit, integration, and e2e test authorship
+      and repair. Routes continuous LLM-agent quality evals to agent-eval-engineer, API load/contract testing to api-tester,
+      and test-artifact trend analysis to test-results-analyzer.
+    description_hash: sha256:547b2b5c529c804ccb7dcf899aa78785c7cf80ecc845a6c3d0d599c0a9bbcd97
     body_hash: sha256:364cad1fb03e3621fd63c2f01b4013d90997b50dc7e88224cd6051be3a0dc6c3
     tags:
     - engineering

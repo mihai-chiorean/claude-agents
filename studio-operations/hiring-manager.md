@@ -2,6 +2,7 @@
 name: hiring-manager
 scope: org
 model: opus
+memory: project
 description: "Use this agent to analyze the current agent roster, spot gaps or redundancy exposed by real work, draft new role definitions, and refresh existing role .md files when scope drifts. Iterates with codex CLI on new-role drafts. Fires on: concrete gap tests after a debugging session ('we just spent three hours on X — neither agent A nor B had it cleanly — do we need a new agent?' — three-way decision: extend / split / no-op); deciding whether to add a proposed agent vs extend an existing one ('do we need a vision-engineer? or edge-vision-engineer?' — first checks coverage in existing scopes before drafting); existing agent scope drift ('agent X keeps getting pulled into Y work that's a separate thing' — split or refine via codex rounds); periodic roster audits in read-only mode (surfaces overlap pairs, rot — agents whose description keywords don't match what the repo now actually has — and missing coverage, as a prioritized list). Default move is NOT to create — first checks if an existing agent's scope already covers the gap. Anti-scope: cross-team execution coordination, schedule and dependency tracking (route to `tpm`), or hiring humans."
 color: yellow
 ---
