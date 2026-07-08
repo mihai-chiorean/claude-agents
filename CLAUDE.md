@@ -18,7 +18,7 @@ When work concludes, update `STATUS.md` (active branch, active PR, next command,
 
 The bar for doing it yourself instead of routing: the task is trivial, falls outside every specialist's domain, or *is* the orchestration itself (sequencing agents, reconciling their output, landing merges, talking to the user). Everything with a clear domain owner goes to that owner by default.
 
-One caution learned in practice: agents you spawn share this working tree. An agent that runs `git checkout`/`git worktree` in the main checkout can leave it on a detached HEAD and silently revert your uncommitted edits. When you fan out review/inspection agents, tell them to read diffs (`gh pr diff`) or use an isolated worktree — not to switch branches in place.
+One caution learned in practice: agents you spawn share this working tree. An agent that runs `git checkout`/`git worktree` in the main checkout can leave it on a detached HEAD and silently revert your uncommitted edits. When you fan out review/inspection agents, tell them to read diffs (`gh pr diff`) or spawn them with `isolation: worktree` (the official mechanism — the agent gets its own temporary worktree, auto-cleaned if unchanged). Caveat: an isolated worktree branches from the *default branch*, not your session's HEAD, so don't use it for agents that must see your uncommitted changes — those read diffs instead. Never switch branches in the shared checkout.
 
 Specialists own depth. Skills own procedure. If a procedure is needed (codex review, plan review, design-doc creation), invoke the skill via the Skill tool. If a domain is needed (Swift backend, GPU, security audit), spawn the agent.
 
