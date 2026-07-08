@@ -2,25 +2,26 @@
 """Validate agent .md and skill SKILL.md files against Anthropic's frontmatter spec.
 
 Per MIT-413, this validator was rewritten to match Anthropic's published agent
-and skill spec (see research/agent-skill-spec-ground-truth-MIT-410.md). Before,
-KNOWN_KEYS conflated "what generate-manifest.py consumes" with "what the spec
-allows" — the result was that spec-correct fields (`allowed-tools`, `effort`,
-`disable-model-invocation`) tripped warnings while spec-incorrect ones (`tools`,
-`color`) were silently accepted. This file is now spec-first.
+and skill spec (research/agent-skill-spec-ground-truth-MIT-410.md), and
+re-aligned 2026-06-19 to the June-2026 spec (research/
+agent-spec-currency-2026-06.md): agent tool restriction is now `tools` /
+`disallowedTools` (kebab `allowed-tools` is skills-only), `color` and
+`skills` became official agent fields, and permissionMode/maxTurns/
+mcpServers/memory/background/isolation/initialPrompt were added.
 
 Checks performed:
   - HARD: frontmatter parses with strict YAML (yaml.safe_load).
   - HARD: required keys present (`name`, `description`).
+  - HARD (agents): skill-only keys (`allowed-tools`, `when_to_use`, ...) —
+    silently ignored by the loader, so the author's intended restriction or
+    behavior never takes effect (this shipped MIT-433's restrictions inert).
   - HARD (skills only): combined len(description) + len(when_to_use) ≤ 1536
     chars. This is Anthropic's documented router truncation cap.
   - WARN (agents): description ≤ 2000 chars. No documented spec cap, but the
     spirit is "tight"; 2000 is generous to allow MIT-415 gradual migration.
+  - WARN (agents): `color` outside the official 8-value enum (UI ignores it).
   - WARN: description contains XML tags (tracked separately under MIT-393).
-  - WARN: non-spec frontmatter keys (e.g. `tools`, `color`, `skills`,
-    `version`, `references`). For agents, see TODO below about MIT-412.
-  - WARN: agent has `tools:` field — silently ignored by Claude Code, almost
-    always means the author intended `allowed-tools:`. Will tighten to HARD
-    after MIT-412 sweeps the existing 51 agents off this field.
+  - WARN: non-spec frontmatter keys (grandfathered files; new files HARD).
 
 Carve-out:
   - `scope:` on agents is an inc-repo extension consumed by install.sh's
@@ -64,12 +65,36 @@ XML_TAG_RE = re.compile(r"<[a-zA-Z/]")
 BASELINE_PATH = Path(__file__).resolve().parent / "validate-agents-baseline.json"
 
 # Per Anthropic sub-agents.md spec
-# (https://code.claude.com/docs/en/sub-agents.md).
+# (https://code.claude.com/docs/en/sub-agents.md → "Supported frontmatter
+# fields"), re-verified 2026-06-19 (see research/agent-spec-currency-2026-06.md).
+# NOTE the June-2026 spec changes vs the MIT-410-era snapshot:
+#   - tool restriction is `tools` (allowlist) + `disallowedTools` (denylist,
+#     camelCase). `allowed-tools`/`disallowed-tools` are SKILL fields and are
+#     silently ignored on agents.
+#   - `color`, `skills` are now official agent fields (un-grandfathered).
+#   - new fields: permissionMode, maxTurns, mcpServers, memory, background,
+#     isolation, initialPrompt.
+#   - `user-invocable`, `disable-model-invocation`, `context`, `agent`,
+#     `paths` are skills-only; no longer accepted on agents.
 AGENT_SPEC_KEYS = {
-    "name", "description", "model", "effort",
-    "allowed-tools", "disallowed-tools",
-    "user-invocable", "disable-model-invocation",
-    "context", "agent", "hooks", "paths",
+    "name", "description", "tools", "disallowedTools", "model",
+    "permissionMode", "maxTurns", "skills", "mcpServers", "hooks",
+    "memory", "background", "effort", "isolation", "color", "initialPrompt",
+}
+
+# Official display-color enum for agents (sub-agents.md `color` row).
+# Off-enum values are silently ignored by the UI — WARN so authors notice.
+AGENT_COLOR_ENUM = {
+    "red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan",
+}
+
+# Skill-side fields that are silently ignored if placed on an AGENT. Worse
+# than unknown keys: the author believes a restriction/behavior is active
+# when it is not (this bit MIT-433 — 22 agents shipped `allowed-tools`
+# restrictions that never took effect). Flagged with a targeted message.
+AGENT_SKILL_ONLY_KEYS = {
+    "allowed-tools", "disallowed-tools", "user-invocable",
+    "disable-model-invocation", "context", "agent", "paths", "when_to_use",
 }
 
 # Per Anthropic skills.md spec
@@ -215,21 +240,30 @@ def validate_agent(path: Path, baseline: dict[str, set[str]]) -> dict:
             )
         if XML_TAG_RE.search(desc):
             warn.append("description contains XML tags (Anthropic spec: none); see MIT-415")
-        # `when_to_use` is a SKILLS-only spec field. If an agent has it,
-        # it's silently ignored — almost certainly a copy-paste from a
-        # skill. WARN so the author notices.
-        if "when_to_use" in parsed:
-            warn.append(
-                "'when_to_use' is a skills-spec field; on agents it's silently "
-                "ignored. Did you mean to put this on a SKILL.md, or fold it "
-                "into 'description'?"
-            )
+    # Skill-only fields on an agent are silently ignored by the loader —
+    # the author believes a restriction/behavior is active when it isn't.
+    # HARD-fail: this is exactly how MIT-433's `allowed-tools` restrictions
+    # shipped inactive on 22 agents.
+    skill_only = sorted(k for k in parsed.keys() if k in AGENT_SKILL_ONLY_KEYS)
+    if skill_only:
+        hard.append(
+            f"skill-only frontmatter keys {skill_only!r} on an AGENT are "
+            "silently ignored (tool restriction on agents is `tools` / "
+            "`disallowedTools` per sub-agents.md). Rename or move to a "
+            "SKILL.md."
+        )
 
-    # Non-spec keys. Allow `scope` (inc carve-out). For other non-spec keys
-    # (tools, color, skills, etc.): grandfathered files get WARN, new files
-    # get HARD. This stops new debt while allowing the existing 52 agents
-    # to migrate gradually via MIT-412 / MIT-415.
-    allowed = AGENT_SPEC_KEYS | INC_EXTENSION_KEYS
+    # Off-enum colors are silently ignored by the UI.
+    if "color" in parsed and parsed.get("color") not in AGENT_COLOR_ENUM:
+        warn.append(
+            f"color '{parsed.get('color')}' is not in the official enum "
+            f"{sorted(AGENT_COLOR_ENUM)} and will be ignored by the UI"
+        )
+
+    # Non-spec keys. Allow `scope` (inc carve-out). For other non-spec keys:
+    # grandfathered files get WARN, new files get HARD. This stops new debt
+    # while allowing existing debt to migrate gradually.
+    allowed = AGENT_SPEC_KEYS | INC_EXTENSION_KEYS | AGENT_SKILL_ONLY_KEYS
     unknown = sorted(k for k in parsed.keys() if k not in allowed)
     if unknown:
         grandfathered_keys = baseline.get(rel, set())
@@ -238,8 +272,8 @@ def validate_agent(path: Path, baseline: dict[str, set[str]]) -> dict:
         if new_debt:
             hard.append(
                 f"non-spec frontmatter keys {new_debt!r} on agent — Anthropic's "
-                "sub-agents.md does not list these (e.g. `tools` is silently "
-                "ignored; spec field is `allowed-tools`). This file is not "
+                "sub-agents.md does not list these; the loader silently "
+                "ignores them. This file is not "
                 "in scripts/validate-agents-baseline.json so we treat the "
                 "key as NEW debt and HARD-fail. Either use the spec-correct "
                 "field name, or add the file to the baseline if grandfathering "

@@ -2,7 +2,7 @@
 name: db-migration
 model: sonnet
 description: "Use this agent for creating database migrations, validating migration ordering across repositories, checking for destructive schema changes, or keeping Go and Swift ORMs consistent with the DB schema. Owns PostgreSQL DDL safety and the multi-service migration discipline where the Go (wendycloud) and Swift (cloud) backends share one database. Fires on: \"add a device_tokens table for push notifications\" — new migration creation (IF NOT EXISTS guards, reversible up/down pairs, NOT NULL + DEFAULT handling for live tables); \"Go and Swift both have migration 19 but they differ\" — cross-repo numbering conflicts (canonical ordering, sync between repos, shared migration history); \"production has columns not in any migration file\" — schema-drift detection (out-of-band manual SQL, missing migrations, drift); destructive changes (column drops, type narrowing, NOT NULL adds) requiring rename-then-drop or backfill; ALTER TABLE lock-duration estimation and `CREATE INDEX CONCURRENTLY` discipline; PostgreSQL choices (`timestamptz` vs `timestamp`, `jsonb` vs `json`, UUID vs serial PKs, GIN/GiST/BRIN, PostGIS for spatial); enum evolution and ORM type checks across Go (sqlc/gorm) and Swift (postgres-nio). Anti-scope: live-traffic-safe API-level rollout (expand/contract orchestration, feature flags) routes to `backend-architect`; postgres-nio query implementation on the Swift side routes to `swift-backend`; SQL-injection / auth audits route to `security-auditor`."
-color: teal
+color: cyan
 skills: postgres
 ---
 

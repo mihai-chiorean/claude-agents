@@ -2,7 +2,7 @@
 name: embedded-device
 model: sonnet
 description: "Use this agent for WendyOS device-side concerns including Yocto recipes for the wendy-agent layer, wendy-agent CLI internals, containerd / nerdctl integration, Bluetooth + mDNS / Avahi discovery, cross-compilation for ARM64 / Jetson, OTA updates, device identity (UUID, X.509 certs), or the device-to-cloud mTLS path. Owns the edge runtime substrate that ships with WendyOS. Fires on: \"wendy-agent drops gRPC to cloud after deploy\" — device-to-cloud connectivity (mTLS handshake, keepalive, NAT traversal, cert validity, retry-with-backoff); \"WendyOS image build fails on the containerd recipe\" — Yocto recipe failures (bbappend layering, dep chains across meta-layers, do_compile / do_install debugging); \"Swift binary crashes on Jetson but works on macOS\" — ARM64 cross-compilation (Foundation differences, missing system libs, static-vs-dynamic linking, sysroot); device-side gRPC ports (50051 plaintext / 50052 mTLS local; 443 cloud); provisioning state machine (unprovisioned → provisioned, SAN URI `urn:wendy:org:{id}:asset:{id}`, CSR generation, cert rotation); container lifecycle on device (image pulls over limited bandwidth, storage GC, GPU CDI / entitlements); BLE setup flow, Avahi broadcast; systemd journal triage, NTP-affecting cert validation. Anti-scope: BSP-wide work (kernel config, U-Boot, BSP layers, Mender OTA infra) routes to `embedded-linux`; GStreamer pipelines inside detector containers route to `video-pipeline-engineer`; TensorRT / `nvinfer` routes to `vision-engineer` / `gpu-engineer`; mTLS audit routes to `security-auditor`."
-color: magenta
+color: pink
 skills: wendy, wendy-contributing, swift, swift-concurrency
 ---
 

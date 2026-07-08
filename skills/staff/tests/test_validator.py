@@ -87,61 +87,79 @@ def _find(payload: dict, file_suffix: str) -> dict:
 
 class TestAgentValidation(unittest.TestCase):
     def test_agent_with_only_spec_fields_is_clean(self) -> None:
-        """An agent using `name`, `description`, `model`, `allowed-tools`
-        — all in Anthropic's spec — should validate clean."""
+        """An agent using name/description/model/tools/color/skills
+        (all in the June-2026 sub-agents.md spec) validates clean."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             write_agent(root, "engineering", "alpha",
                         "---\nname: alpha\ndescription: Does the alpha thing.\n"
-                        "model: sonnet\nallowed-tools: Read Write\n---\n\nBody.\n")
+                        "model: sonnet\ntools: Read Write\ncolor: cyan\n"
+                        "skills: [postgres]\n---\n\nBody.\n")
             code, payload = run_validator(root)
             self.assertEqual(code, 0)
             r = _find(payload, "engineering/alpha.md")
             self.assertEqual(r["hard_errors"], [])
             self.assertEqual(r["warnings"], [])
 
-    def test_agent_with_allowed_tools_does_not_warn(self) -> None:
-        """`allowed-tools` is spec-correct — must not trip the non-spec warn."""
+    def test_agent_with_allowed_tools_hard_fails(self) -> None:
+        """allowed-tools is a SKILL field; on an agent it is silently ignored
+        (the restriction never takes effect) -> HARD, targeted message."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             write_agent(root, "engineering", "alpha",
                         "---\nname: alpha\ndescription: Alpha.\n"
                         "allowed-tools: Read, Write\n---\n\nBody.\n")
-            _code, payload = run_validator(root)
+            code, payload = run_validator(root)
+            self.assertEqual(code, 1, "skill-only key on agent must HARD-fail")
             r = _find(payload, "engineering/alpha.md")
-            self.assertEqual(r["warnings"], [],
-                             f"unexpected warns: {r['warnings']}")
+            self.assertTrue(any("skill-only" in e and "allowed-tools" in e
+                                for e in r["hard_errors"]),
+                            f"expected skill-only HARD, got {r['hard_errors']}")
 
-    def test_agent_with_tools_field_new_file_hard_fails(self) -> None:
-        """`tools:` on a fresh (non-grandfathered) agent: NEW debt → HARD."""
+    def test_agent_with_tools_field_is_clean(self) -> None:
+        """tools: is the spec allowlist field for agents (June-2026 spec)."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             write_agent(root, "engineering", "alpha",
                         "---\nname: alpha\ndescription: Alpha.\n"
                         "tools: Read, Write\n---\n\nBody.\n")
             code, payload = run_validator(root)
-            self.assertEqual(code, 1, "non-spec key on non-grandfathered file must HARD-fail")
+            self.assertEqual(code, 0)
             r = _find(payload, "engineering/alpha.md")
-            self.assertTrue(any("'tools'" in e for e in r["hard_errors"]),
-                            f"expected HARD on 'tools', got {r['hard_errors']}")
+            self.assertEqual(r["hard_errors"], [])
+            self.assertEqual(r["warnings"], [])
 
-    def test_agent_with_tools_field_grandfathered_warns(self) -> None:
-        """`tools:` on a grandfathered agent (listed in baseline): WARN only."""
+    def test_agent_offenum_color_warns(self) -> None:
+        """A color outside the official enum is ignored by the UI -> WARN."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
             write_agent(root, "engineering", "alpha",
                         "---\nname: alpha\ndescription: Alpha.\n"
-                        "tools: Read, Write\n---\n\nBody.\n")
+                        "color: chartreuse\n---\n\nBody.\n")
+            code, payload = run_validator(root)
+            self.assertEqual(code, 0, "off-enum color is WARN, not HARD")
+            r = _find(payload, "engineering/alpha.md")
+            self.assertTrue(any("color" in w and "chartreuse" in w
+                                for w in r["warnings"]),
+                            f"expected off-enum color warn, got {r['warnings']}")
+
+    def test_agent_nonspec_key_grandfathered_warns(self) -> None:
+        """A truly non-spec key on a grandfathered agent: WARN only (exercises
+        the grandfather mechanism with a made-up key)."""
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            write_agent(root, "engineering", "alpha",
+                        "---\nname: alpha\ndescription: Alpha.\n"
+                        "frobnicate: yes\n---\n\nBody.\n")
             write_baseline(root, grandfathered_agents=[
-                {"file": "engineering/alpha.md", "non_spec_keys": ["tools"]},
+                {"file": "engineering/alpha.md", "non_spec_keys": ["frobnicate"]},
             ])
             code, payload = run_validator(root)
             self.assertEqual(code, 0, "grandfathered non-spec key must NOT HARD-fail")
             r = _find(payload, "engineering/alpha.md")
-            self.assertEqual(r["hard_errors"], [])
-            self.assertTrue(any("grandfathered" in w and "'tools'" in w
+            self.assertTrue(any("grandfathered" in w and "'frobnicate'" in w
                                 for w in r["warnings"]),
-                            f"expected grandfather warn for 'tools', got {r['warnings']}")
+                            f"expected grandfather warn, got {r['warnings']}")
 
     def test_agent_with_scope_does_not_warn(self) -> None:
         """`scope:` is an inc-repo extension consumed by install.sh — carve-out."""
@@ -318,17 +336,20 @@ class TestSkillValidation(unittest.TestCase):
             r = _find(payload, "engineering/restricted.md")
             self.assertEqual(r["warnings"], [])
 
-    def test_agent_with_when_to_use_warns(self) -> None:
-        """`when_to_use` is a skills-only spec field. On agents → WARN."""
+    def test_agent_with_when_to_use_hard_fails(self) -> None:
+        """when_to_use is a skills-only field. On agents it is silently
+        ignored -> HARD (skill-only key check, June-2026 spec)."""
         with tempfile.TemporaryDirectory() as td:
             root = Path(td)
-            write_agent(root, "engineering", "confused",
-                        "---\nname: confused\ndescription: Description.\n"
+            write_agent(root, "engineering", "alpha",
+                        "---\nname: alpha\ndescription: Alpha.\n"
                         "when_to_use: When user asks.\n---\n\nBody.\n")
-            _code, payload = run_validator(root)
-            r = _find(payload, "engineering/confused.md")
-            self.assertTrue(any("when_to_use" in w for w in r["warnings"]),
-                            f"expected when_to_use warn on agent, got {r['warnings']}")
+            code, payload = run_validator(root)
+            self.assertEqual(code, 1, "skill-only key on agent must HARD-fail")
+            r = _find(payload, "engineering/alpha.md")
+            self.assertTrue(any("skill-only" in e and "when_to_use" in e
+                                for e in r["hard_errors"]),
+                            f"expected skill-only HARD, got {r['hard_errors']}")
 
 
 class TestSummaryShape(unittest.TestCase):
