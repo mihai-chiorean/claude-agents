@@ -1,5 +1,8 @@
 # MIT-410: Claude Code Agent and Skill Authoring Specification
 
+> **2026-06-19 — partially superseded.** The AGENT frontmatter field list below is stale: the June-2026 spec renamed agent tool restriction to `tools`/`disallowedTools`, legalized `color` and `skills`, and added permissionMode/maxTurns/mcpServers/memory/background/isolation/initialPrompt. See `research/agent-spec-currency-2026-06.md`. The SKILL field list remains current.
+
+
 **Research Date**: May 27, 2026  
 **Status**: Ground-truth extraction from Anthropic Claude Code documentation  
 **Scope**: Agent file format, skill format, sub-agent invocation, routing, and recent changes
